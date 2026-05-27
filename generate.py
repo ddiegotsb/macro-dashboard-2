@@ -22,7 +22,22 @@ def fetch(series_id, first, last):
     r = requests.get(url, timeout=30)
     r.raise_for_status()
     data = r.json()
-    obs = data.get("Series", {}).get("Obs", [])
+    print(f"  API response keys: {list(data.keys())}")
+
+    # La API puede devolver Series como dict o como lista
+    series = data.get("Series", {})
+    if isinstance(series, list):
+        series = series[0] if series else {}
+
+    obs = series.get("Obs") if series else None
+
+    # Obs puede venir como None, dict (un solo registro), o lista
+    if obs is None:
+        print(f"  Aviso: Obs es None para {series_id}, retornando lista vacía")
+        return []
+    if isinstance(obs, dict):
+        obs = [obs]
+
     result = []
     for o in obs:
         try:
@@ -77,6 +92,13 @@ def main():
     print("Fetching TPM...")
     tpm = fetch(SERIES["tpm"], first, today)
     print(f"  {len(tpm)} registros")
+    if not tpm:
+        print("  TPM diaria vacia, probando alternativas...")
+        for alt in ["F022.BCO.TAB.D", "F022.BCO.TAB.D.3", "F022.BCO.TAB.D.M"]:
+            tpm = fetch(alt, first, today)
+            print(f"  alternativa {alt}: {len(tpm)} registros")
+            if tpm:
+                break
 
     print("Fetching IPC...")
     ipc = fetch(SERIES["ipc"], first, today)
